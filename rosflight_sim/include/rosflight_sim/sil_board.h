@@ -53,7 +53,7 @@ namespace rosflight_sim
 class SIL_Board : public rosflight_firmware::UDPBoard
 {
 private:
-  gazebo::math::Vector3 inertial_magnetic_field_;
+  ignition::math::Vector3d inertial_magnetic_field_;
 
   double imu_update_rate_;
 
@@ -81,9 +81,9 @@ private:
   double sonar_max_range_;
   double sonar_min_range_;
 
-  gazebo::math::Vector3 gyro_bias_;
-  gazebo::math::Vector3 acc_bias_;
-  gazebo::math::Vector3 mag_bias_;
+  ignition::math::Vector3d gyro_bias_;
+  ignition::math::Vector3d acc_bias_;
+  ignition::math::Vector3d mag_bias_;
   double baro_bias_;
   double airspeed_bias_;
 
@@ -91,7 +91,7 @@ private:
   std::normal_distribution<double> normal_distribution_;
   std::uniform_real_distribution<double> uniform_distribution_;
 
-  gazebo::math::Vector3 gravity_;
+  ignition::math::Vector3d gravity_;
   double ground_altitude_;
 
   gazebo::physics::WorldPtr world_;
@@ -114,9 +114,9 @@ private:
   void RCCallback(const rosflight_msgs::RCRaw& msg);
   bool motors_spinning();
 
-  gazebo::math::Vector3 prev_vel_1_;
-  gazebo::math::Vector3 prev_vel_2_;
-  gazebo::math::Vector3 prev_vel_3_;
+  ignition::math::Vector3d prev_vel_1_;
+  ignition::math::Vector3d prev_vel_2_;
+  ignition::math::Vector3d prev_vel_3_;
   gazebo::common::Time last_time_;
 
 public:

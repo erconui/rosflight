@@ -52,7 +52,8 @@ ROSflightSIL::ROSflightSIL() :
 
 ROSflightSIL::~ROSflightSIL()
 {
-  gazebo::event::Events::DisconnectWorldUpdateBegin(updateConnection_);
+  updateConnection_.reset();
+  // gazebo::event::Events::DisconnectWorldUpdateBegin(updateConnection_);
   if (nh_) {
     nh_->shutdown();
     delete nh_;
@@ -115,7 +116,7 @@ void ROSflightSIL::Load(gazebo::physics::ModelPtr _model, sdf::ElementPtr _sdf)
   // Connect the update function to the simulation
   updateConnection_ = gazebo::event::Events::ConnectWorldUpdateBegin(boost::bind(&ROSflightSIL::OnUpdate, this, _1));
 
-  initial_pose_ = link_->GetWorldCoGPose();
+  initial_pose_ = link_->WorldCoGPose();
 
   truth_NED_pub_ = nh_->advertise<nav_msgs::Odometry>("truth/NED", 1);
   truth_NWU_pub_ = nh_->advertise<nav_msgs::Odometry>("truth/NWU", 1);
@@ -132,13 +133,13 @@ void ROSflightSIL::OnUpdate(const gazebo::common::UpdateInfo& _info)
   NWU_to_NED << 1, 0, 0, 0, -1, 0, 0, 0, -1;
 
   MAVForcesAndMoments::Current_State state;
-  gazebo::math::Pose pose = link_->GetWorldCoGPose();
-  gazebo::math::Vector3 vel = link_->GetRelativeLinearVel();
-  gazebo::math::Vector3 omega = link_->GetRelativeAngularVel();
+  ignition::math::Pose3d pose = link_->WorldCoGPose();
+  ignition::math::Vector3d vel = link_->RelativeLinearVel();
+  ignition::math::Vector3d omega = link_->RelativeAngularVel();
 
   // Convert gazebo types to Eigen and switch to NED frame
-  state.pos = NWU_to_NED * vec3_to_eigen_from_gazebo(pose.pos) ;
-  state.rot = NWU_to_NED * rotation_to_eigen_from_gazebo(pose.rot);
+  state.pos = NWU_to_NED * vec3_to_eigen_from_gazebo(pose.Pos()) ;
+  state.rot = NWU_to_NED * rotation_to_eigen_from_gazebo(pose.Rot());
   state.vel = NWU_to_NED * vec3_to_eigen_from_gazebo(vel);
   state.omega = NWU_to_NED * vec3_to_eigen_from_gazebo(omega);
   state.t = _info.simTime.Double();
@@ -146,8 +147,8 @@ void ROSflightSIL::OnUpdate(const gazebo::common::UpdateInfo& _info)
   forces_ = mav_dynamics_->updateForcesAndTorques(state, board_.get_outputs());
 
   // apply the forces and torques to the joint (apply in NWU)
-  gazebo::math::Vector3 force = vec3_to_gazebo_from_eigen(NWU_to_NED * forces_.block<3,1>(0,0));
-  gazebo::math::Vector3 torque = vec3_to_gazebo_from_eigen(NWU_to_NED *  forces_.block<3,1>(3,0));
+  ignition::math::Vector3d force = vec3_to_gazebo_from_eigen(NWU_to_NED * forces_.block<3,1>(0,0));
+  ignition::math::Vector3d torque = vec3_to_gazebo_from_eigen(NWU_to_NED *  forces_.block<3,1>(3,0));
   link_->AddRelativeForce(force);
   link_->AddRelativeTorque(torque);
 
@@ -159,7 +160,7 @@ void ROSflightSIL::Reset()
 {
     link_->SetWorldPose(initial_pose_);
     link_->ResetPhysicsStates();
-//  start_time_us_ = (uint64_t)(world_->GetSimTime().Double() * 1e3);
+//  start_time_us_ = (uint64_t)(world_->SimTime().Double() * 1e3);
 //  rosflight_init();
 }
 
@@ -172,28 +173,28 @@ void ROSflightSIL::windCallback(const geometry_msgs::Vector3 &msg)
 
 void ROSflightSIL::publishTruth()
 {
-  gazebo::math::Pose pose = link_->GetWorldCoGPose();
-  gazebo::math::Vector3 vel = link_->GetRelativeLinearVel();
-  gazebo::math::Vector3 omega = link_->GetRelativeAngularVel();
+  ignition::math::Pose3d pose = link_->WorldCoGPose();
+  ignition::math::Vector3d vel = link_->RelativeLinearVel();
+  ignition::math::Vector3d omega = link_->RelativeAngularVel();
 
   // Publish truth
   nav_msgs::Odometry truth;
-  truth.header.stamp.sec = world_->GetSimTime().sec;
-  truth.header.stamp.nsec = world_->GetSimTime().nsec;
+  truth.header.stamp.sec = world_->SimTime().sec;
+  truth.header.stamp.nsec = world_->SimTime().nsec;
   truth.header.frame_id = link_name_ + "_NWU";
-  truth.pose.pose.orientation.w = pose.rot.w;
-  truth.pose.pose.orientation.x = pose.rot.x;
-  truth.pose.pose.orientation.y = pose.rot.y;
-  truth.pose.pose.orientation.z = pose.rot.z;
-  truth.pose.pose.position.x = pose.pos.x;
-  truth.pose.pose.position.y = pose.pos.y;
-  truth.pose.pose.position.z = pose.pos.z;
-  truth.twist.twist.linear.x = vel.x;
-  truth.twist.twist.linear.y = vel.y;
-  truth.twist.twist.linear.z = vel.z;
-  truth.twist.twist.angular.x = omega.x;
-  truth.twist.twist.angular.y = omega.y;
-  truth.twist.twist.angular.z = omega.z;
+  truth.pose.pose.orientation.w = pose.Rot().W();
+  truth.pose.pose.orientation.x = pose.Rot().X();
+  truth.pose.pose.orientation.y = pose.Rot().Y();
+  truth.pose.pose.orientation.z = pose.Rot().Z();
+  truth.pose.pose.position.x = pose.Pos().X();
+  truth.pose.pose.position.y = pose.Pos().Y();
+  truth.pose.pose.position.z = pose.Pos().Z();
+  truth.twist.twist.linear.x = vel.X();
+  truth.twist.twist.linear.y = vel.Y();
+  truth.twist.twist.linear.z = vel.Z();
+  truth.twist.twist.angular.x = omega.X();
+  truth.twist.twist.angular.y = omega.Y();
+  truth.twist.twist.angular.z = omega.Z();
   truth_NWU_pub_.publish(truth);
 
   // Convert to NED
@@ -209,22 +210,22 @@ void ROSflightSIL::publishTruth()
   truth_NED_pub_.publish(truth);
 }
 
-Eigen::Vector3d ROSflightSIL::vec3_to_eigen_from_gazebo(gazebo::math::Vector3 vec)
+Eigen::Vector3d ROSflightSIL::vec3_to_eigen_from_gazebo(ignition::math::Vector3d vec)
 {
   Eigen::Vector3d out;
-  out << vec.x, vec.y, vec.z;
+  out << vec.X(), vec.Y(), vec.Z();
   return out;
 }
 
-gazebo::math::Vector3 ROSflightSIL::vec3_to_gazebo_from_eigen(Eigen::Vector3d vec)
+ignition::math::Vector3d ROSflightSIL::vec3_to_gazebo_from_eigen(Eigen::Vector3d vec)
 {
-  gazebo::math::Vector3 out(vec(0), vec(1), vec(2));
+  ignition::math::Vector3d out(vec(0), vec(1), vec(2));
   return out;
 }
 
-Eigen::Matrix3d ROSflightSIL::rotation_to_eigen_from_gazebo(gazebo::math::Quaternion quat)
+Eigen::Matrix3d ROSflightSIL::rotation_to_eigen_from_gazebo(ignition::math::Quaterniond quat)
 {
-  Eigen::Quaterniond eig_quat(quat.w, quat.x, quat.y, quat.z);
+  Eigen::Quaterniond eig_quat(quat.W(), quat.X(), quat.Y(), quat.Z());
   return eig_quat.toRotationMatrix();
 }
 

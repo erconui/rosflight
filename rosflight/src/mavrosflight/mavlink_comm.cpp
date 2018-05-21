@@ -35,6 +35,7 @@
  */
 
 #include <rosflight/mavrosflight/mavlink_comm.h>
+#include <iostream>
 
 namespace mavrosflight
 {
